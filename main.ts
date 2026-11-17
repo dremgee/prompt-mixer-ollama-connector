@@ -23,18 +23,23 @@ interface ChatCompletion {
 	stats: { model: string };
 }
 
+// Lists only the models actually installed in the local Ollama.
+// If Ollama isn't running, returns an empty list rather than guessing.
 async function getDynamicModelList(): Promise<string[]> {
 	try {
-		const list: ListResponse = await (
-			await fetch('http://localhost:11434/api/tags')
-		).json();
-
-		const getModelNames = list.models.map((model) => model.name);
-
-		return getModelNames.length ? getModelNames : config.models;
+		const response = await fetch('http://127.0.0.1:11434/api/tags', {
+			signal: AbortSignal.timeout(3000),
+		});
+		if (!response.ok) {
+			throw new Error(`Ollama returned HTTP ${response.status}`);
+		}
+		const list: ListResponse = await response.json();
+		return list.models
+			.map((model) => model.name)
+			.sort((a, b) => a.localeCompare(b));
 	} catch (error) {
-		console.error('Error in getDynamicModelList function:', error);
-		return config.models;
+		console.error('Could not list Ollama models (is Ollama running?):', error);
+		return [];
 	}
 }
 
